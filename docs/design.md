@@ -21,9 +21,22 @@ The pipeline will count bytes while accepting the upload, identify and decode ac
 
 Animated images and SVG are rejected in the initial pipeline. This includes animated WebP; no silent first-frame flattening. An explicit animation policy would require a later design review. SVG is not a raster photo and will not be decoded through this pipeline.
 
-The upload is read into bounded memory, and the byte limit is checked during each read. Signature and animation checks precede Magick.NET header inspection; width, height and pixel count are checked before full decode. Native ImageMagick limits are process-wide: the processor sets memory to 256 MiB, disk pixel cache to zero, list length to 16, thread count to two and maximum width/height to 10,000. Per-request limits are stricter when configured. These process-wide settings can affect other Magick.NET users in the same host; this needs API/hosting review. A separate host process and OS memory/CPU limits are recommended for untrusted high-volume uploads. Cancellation is checked during input reads and between synchronous native stages; it cannot interrupt a native decode or encode already in progress.
+The upload is read into bounded memory, and the byte limit is checked during each read. Signature and animation checks precede Magick.NET header inspection; width, height and pixel count are checked before full decode. The processor does not change ImageMagick's process-wide `ResourceLimits`. The host must set native limits explicitly at startup, before processing images or sharing Magick.NET with other components. For example, an upload-only host can set:
 
-Reencoded outputs have profiles and metadata stripped after auto-orientation. `PreserveIfPossible` retains original bytes and their metadata when the orientation and size already comply, so choose it only when that retention is acceptable. Invalid input is reported with an `ImageProcessingException` category; storage and native runtime errors propagate. Cleanup runs with an uncancelled token and preserves the original error if deletion fails. A storage adapter must avoid publishing a partial object when `SaveAsync` throws, since the processor has no key to clean up in that case.
+```csharp
+using ImageMagick;
+
+ResourceLimits.Memory = 256UL * 1024 * 1024;
+ResourceLimits.Disk = 512UL * 1024 * 1024;
+ResourceLimits.ListLength = 16;
+ResourceLimits.Thread = 2;
+ResourceLimits.Width = 10_000;
+ResourceLimits.Height = 10_000;
+```
+
+These values are deployment examples, not library defaults. The host owns their sizing for concurrency and other Magick.NET users, protects the native temporary directory, and should use OS/container memory, disk and CPU limits for untrusted high-volume uploads. Per-request byte, dimension and pixel limits remain enforced in the processor. Cancellation is checked during input reads and between synchronous native stages; it cannot interrupt a native decode or encode already in progress.
+
+Reencoded outputs have profiles and metadata stripped after auto-orientation. `PreserveIfPossible` retains original bytes and their metadata only when input format equals `OriginalFormat`, orientation needs no correction and size complies. Any mismatch forces reencoding to `OriginalFormat` and strips metadata. Choose preservation only when metadata retention is acceptable. Invalid input is reported with an `ImageProcessingException` category; storage and native runtime errors propagate. Cleanup runs with an uncancelled token and preserves the original error if deletion fails. A storage adapter must avoid publishing a partial object when `SaveAsync` throws, since the processor has no key to clean up in that case.
 
 ## Review checkpoints
 

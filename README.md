@@ -7,7 +7,6 @@ An early, unpublished .NET 8 media library. `DotnetMedia.Core` holds storage con
 ```csharp
 using DotnetMedia.Core;
 using DotnetMedia.Storage.Local;
-
 using DotnetMedia.Imaging;
 
 IMediaStore store = new LocalMediaStore(@"D:\private-media");
@@ -31,7 +30,9 @@ var result = await new ImageProcessor(store).ProcessAsync(input, new ImageProces
 // result.Original and result.Variants contain keys, types, dimensions and byte lengths.
 ```
 
-`ImageProcessor` ignores uploaded filenames and Content-Type headers. It accepts JPEG, PNG and WebP only, rejects SVG and animation, applies byte/dimension/pixel limits, corrects orientation, and cleans up earlier outputs if a later output fails. Reencoding strips metadata; preserving original bytes retains metadata. `SaveAsync` remains a lower-level storage API and does not itself validate image bytes.
+`ImageProcessor` ignores uploaded filenames and Content-Type headers. It accepts JPEG, PNG and WebP only, rejects SVG and animation, applies byte/dimension/pixel limits, corrects orientation, and cleans up earlier outputs if a later output fails. `PreserveIfPossible` retains input bytes **and metadata** only if input format matches `OriginalFormat`, orientation needs no correction and original size limits are met. Otherwise it reencodes to `OriginalFormat` and strips metadata. `SaveAsync` remains a lower-level storage API and does not itself validate image bytes.
+
+The host must configure Magick.NET native `ResourceLimits` explicitly at startup. They affect the entire process; constructing `ImageProcessor` does not change them. See the [host configuration example](docs/design.md#proposed-upload-settings-and-flow) and choose native memory/disk/thread ceilings appropriate for the deployment. Per-upload byte, dimension and pixel limits remain in `ImageProcessor`.
 
 For deployment, set the storage root to a private absolute directory outside the app and web root. Deny execution and direct web serving at the filesystem and server level; restrict permissions to the service identity. The constructor rejects paths inside `AppContext.BaseDirectory`, but it cannot enforce OS access rules or detect every deployment layout. User supplied filenames never become storage keys. Treat keys as opaque identifiers and authorize read/delete operations in the application.
 

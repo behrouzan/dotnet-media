@@ -3,21 +3,10 @@ using ImageMagick;
 
 namespace DotnetMedia.Imaging;
 
-/// <summary>Validates a raster upload and stores an original plus named versions.</summary>
+/// <summary>Validates a raster upload and stores an original plus named versions. The host configures process-wide native ImageMagick limits explicitly before use.</summary>
 public sealed class ImageProcessor
 {
     private readonly IMediaStore store;
-
-    static ImageProcessor()
-    {
-        // ImageMagick limits are process-wide. These ceilings are independent of per-upload options.
-        ResourceLimits.Memory = 256UL * 1024 * 1024;
-        ResourceLimits.Disk = 0;
-        ResourceLimits.ListLength = 16;
-        ResourceLimits.Thread = 2;
-        ResourceLimits.Width = 10_000;
-        ResourceLimits.Height = 10_000;
-    }
 
     /// <summary>Creates a processor using the supplied storage adapter.</summary>
     public ImageProcessor(IMediaStore store) => this.store = store ?? throw new ArgumentNullException(nameof(store));
@@ -61,7 +50,8 @@ public sealed class ImageProcessor
             image.Strip();
 
             ImageOutput original;
-            if (options.OriginalMode == OriginalMode.PreserveIfPossible && originalOrientation is OrientationType.TopLeft or OrientationType.Undefined &&
+            if (options.OriginalMode == OriginalMode.PreserveIfPossible && format == options.OriginalFormat &&
+                originalOrientation is OrientationType.TopLeft or OrientationType.Undefined &&
                 (options.OriginalMaxWidth == 0 || image.Width <= options.OriginalMaxWidth) &&
                 (options.OriginalMaxHeight == 0 || image.Height <= options.OriginalMaxHeight))
                 original = await SaveAsync("original", bytes, format, (int)image.Width, (int)image.Height, saved, cancellationToken);

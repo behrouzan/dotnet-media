@@ -51,7 +51,7 @@ public sealed class ImageProcessorTests
     }
 
     [Fact]
-    public async Task RejectsFakeCorruptSvgAndAnimatedWebP()
+    public async Task RejectsFakeCorruptAndSvg()
     {
         var processor = new ImageProcessor(new RecordingStore());
         var fake = await Assert.ThrowsAsync<ImageProcessingException>(() => processor.ProcessAsync(new MemoryStream("not an image"u8.ToArray()), new()));
@@ -60,14 +60,6 @@ public sealed class ImageProcessorTests
         Assert.Equal(ImageError.UnsupportedFormat, svg.Error);
         var corrupt = await Assert.ThrowsAsync<ImageProcessingException>(() => processor.ProcessAsync(new MemoryStream([0xff, 0xd8, 0xff, 0x00]), new()));
         Assert.Equal(ImageError.InvalidImage, corrupt.Error);
-        var animatedWebP = new byte[30];
-        "RIFF"u8.CopyTo(animatedWebP);
-        "WEBP"u8.CopyTo(animatedWebP.AsSpan(8));
-        "VP8X"u8.CopyTo(animatedWebP.AsSpan(12));
-        animatedWebP[16] = 10;
-        animatedWebP[20] = 2;
-        var animated = await Assert.ThrowsAsync<ImageProcessingException>(() => processor.ProcessAsync(new MemoryStream(animatedWebP), new()));
-        Assert.Equal(ImageError.AnimatedImage, animated.Error);
     }
 
     [Fact]
@@ -81,17 +73,18 @@ public sealed class ImageProcessorTests
     }
 
     [Fact]
-    public async Task RejectsAnimatedPngMarker()
+    public async Task RejectsValidAnimatedWebP()
     {
-        var png = CreateImage(8, 6, MagickFormat.Png);
+        using var frames = new MagickImageCollection();
+        frames.Add(new MagickImage(MagickColors.Red, 8, 6) { AnimationDelay = 10 });
+        frames.Add(new MagickImage(MagickColors.Blue, 8, 6) { AnimationDelay = 10 });
         using var output = new MemoryStream();
-        output.Write(png, 0, 8);
-        output.Write(new byte[] { 0, 0, 0, 0 });
-        output.Write("acTL"u8);
-        output.Write(new byte[4]);
-        output.Write(png, 8, png.Length - 8);
+        frames.Write(output, MagickFormat.WebP);
+        var bytes = output.ToArray();
+        using (var decoded = new MagickImageCollection(bytes))
+            Assert.Equal(2, decoded.Count);
         var error = await Assert.ThrowsAsync<ImageProcessingException>(() => new ImageProcessor(new RecordingStore()).ProcessAsync(
-            new MemoryStream(output.ToArray()), new()));
+            new MemoryStream(bytes), new()));
         Assert.Equal(ImageError.AnimatedImage, error.Error);
     }
 
@@ -127,11 +120,37 @@ public sealed class ImageProcessorTests
     [Fact]
     public async Task PreservesOriginalBytesWhenPolicyAllows()
     {
-        var bytes = CreateImage(8, 6, MagickFormat.Png);
+        using var image = new MagickImage(MagickColors.Red, 8, 6);
+        var profile = new ExifProfile();
+        profile.SetValue(ExifTag.Artist, "test artist");
+        image.SetProfile(profile);
+        using var encoded = new MemoryStream();
+        image.Write(encoded, MagickFormat.Jpeg);
+        var bytes = encoded.ToArray();
         var store = new RecordingStore();
         var result = await new ImageProcessor(store).ProcessAsync(new MemoryStream(bytes), new ImageProcessingOptions
-        { OriginalMode = OriginalMode.PreserveIfPossible });
+        { OriginalMode = OriginalMode.PreserveIfPossible, OriginalFormat = ImageFormat.Jpeg });
         Assert.Equal(bytes, store.Objects[result.Original.Key]);
+        using var decoded = new MagickImage(store.Objects[result.Original.Key]);
+        Assert.NotNull(decoded.GetExifProfile());
+    }
+
+    [Fact]
+    public async Task DifferentOriginalFormatForcesReencodeAndStripsMetadata()
+    {
+        using var image = new MagickImage(MagickColors.Red, 8, 6);
+        var profile = new ExifProfile();
+        profile.SetValue(ExifTag.Artist, "test artist");
+        image.SetProfile(profile);
+        using var input = new MemoryStream();
+        image.Write(input, MagickFormat.Jpeg);
+        var store = new RecordingStore();
+        var result = await new ImageProcessor(store).ProcessAsync(new MemoryStream(input.ToArray()), new ImageProcessingOptions
+        { OriginalMode = OriginalMode.PreserveIfPossible, OriginalFormat = ImageFormat.Png });
+        Assert.Equal(ImageFormat.Png, result.Original.Format);
+        Assert.Equal("image/png", result.Original.ContentType);
+        using var decoded = new MagickImage(store.Objects[result.Original.Key]);
+        Assert.Null(decoded.GetExifProfile());
     }
 
     [Fact]

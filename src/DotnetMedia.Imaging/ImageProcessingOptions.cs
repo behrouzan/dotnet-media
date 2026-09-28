@@ -14,7 +14,7 @@ public enum ImageFormat
 /// <summary>How the original output is handled.</summary>
 public enum OriginalMode
 {
-    /// <summary>Keep validated input bytes only when orientation and size need no change; metadata is retained.</summary>
+    /// <summary>Keep input bytes only when format matches <see cref="ImageProcessingOptions.OriginalFormat"/>, orientation needs no correction, and size complies. Preserved bytes retain metadata; otherwise the image is reencoded and metadata is stripped.</summary>
     PreserveIfPossible,
     /// <summary>Encode again and remove metadata.</summary>
     Reencode
@@ -53,7 +53,7 @@ public sealed class ImageProcessingOptions
     public IReadOnlyCollection<ImageFormat> AllowedInputFormats { get; init; } = [ImageFormat.Jpeg, ImageFormat.Png, ImageFormat.WebP];
     /// <summary>Original output mode. Reencoding strips metadata.</summary>
     public OriginalMode OriginalMode { get; init; } = OriginalMode.Reencode;
-    /// <summary>Format used when the original is reencoded.</summary>
+    /// <summary>Required original format. A different input format forces reencoding even with <see cref="OriginalMode.PreserveIfPossible"/>.</summary>
     public ImageFormat OriginalFormat { get; init; } = ImageFormat.Jpeg;
     /// <summary>Quality used when the original is reencoded.</summary>
     public int OriginalQuality { get; init; } = 85;
