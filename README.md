@@ -4,6 +4,8 @@ An early, unpublished .NET 8 media library. `DotnetMedia.Core` holds storage con
 
 ## Current use
 
+`keyPrefix` is optional per operation; omit it or pass `null`/`""` to save at the configured root. It is a logical, slash-separated namespace, not a filesystem path. Segments use ASCII letters, digits, `-` and `_`, starting with a letter or digit. Windows device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`) are rejected in every segment regardless of case, on every OS. The store generates each final filename and returns the complete key (for example `shops/42/products/<generated-id>`); keep that key in the consumer's own records for later reads and deletes. The package has no database, entity or migration.
+
 ```csharp
 using DotnetMedia.Core;
 using DotnetMedia.Storage.Local;
@@ -26,8 +28,8 @@ var result = await new ImageProcessor(store).ProcessAsync(input, new ImageProces
         new("card", 640, 640, ResizeMode.Cover, ImageFormat.WebP, 82),
         new("thumb", 240, 240, ResizeMode.Contain, ImageFormat.Jpeg, 80)
     ]
-}, cancellationToken);
-// result.Original and result.Variants contain keys, types, dimensions and byte lengths.
+}, cancellationToken, keyPrefix: "shops/42/products");
+// result.Original and result.Variants contain complete keys, types, dimensions and byte lengths.
 ```
 
 `ImageProcessor` ignores uploaded filenames and Content-Type headers. It accepts JPEG, PNG and WebP only, rejects SVG and animation, applies byte/dimension/pixel limits, corrects orientation, and cleans up earlier outputs if a later output fails. `PreserveIfPossible` retains input bytes **and metadata** only if input format matches `OriginalFormat`, orientation needs no correction and original size limits are met. Otherwise it reencodes to `OriginalFormat` and strips metadata. `SaveAsync` remains a lower-level storage API and does not itself validate image bytes.

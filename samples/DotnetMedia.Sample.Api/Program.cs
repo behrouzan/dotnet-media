@@ -19,6 +19,7 @@ ResourceLimits.Height = (uint)settings.Image.MaxHeight;
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = checked(settings.Image.MaxInputBytes + 1024 * 1024));
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = settings.Image.MaxInputBytes);
 builder.Services.AddSingleton(settings.Image);
+builder.Services.AddSingleton(settings);
 builder.Services.AddSingleton<IMediaStore>(new LocalMediaStore(settings.StorageRoot));
 builder.Services.AddSingleton<ImageProcessor>();
 
@@ -27,7 +28,7 @@ var app = builder.Build();
 // These unauthenticated sample routes are available only for local Development testing.
 if (app.Environment.IsDevelopment())
 {
-app.MapPost("/images", async (HttpRequest request, ImageProcessor processor, ImageProcessingOptions imageOptions, CancellationToken token) =>
+app.MapPost("/images", async (HttpRequest request, ImageProcessor processor, ImageProcessingOptions imageOptions, SampleSettings sampleSettings, CancellationToken token) =>
 {
     if (!request.HasFormContentType)
         return Results.Problem("Expected multipart/form-data with a file field.", statusCode: StatusCodes.Status415UnsupportedMediaType);
@@ -50,7 +51,7 @@ app.MapPost("/images", async (HttpRequest request, ImageProcessor processor, Ima
     await using var input = file.OpenReadStream();
     try
     {
-        var result = await processor.ProcessAsync(input, imageOptions, token);
+        var result = await processor.ProcessAsync(input, imageOptions, token, sampleSettings.StorageKeyPrefix);
         return Results.Ok(result);
     }
     catch (ImageProcessingException error)
@@ -65,7 +66,7 @@ app.MapPost("/images", async (HttpRequest request, ImageProcessor processor, Ima
     }
 });
 
-    app.MapGet("/media/{key}", async (string key, IMediaStore store, CancellationToken token) =>
+    app.MapGet("/media/{**key}", async (string key, IMediaStore store, CancellationToken token) =>
     {
         try { return Results.File(await store.OpenReadAsync(key, token), "application/octet-stream"); }
         catch (ArgumentException) { return Results.BadRequest(); }

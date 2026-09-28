@@ -1,10 +1,12 @@
 using DotnetMedia.Imaging;
+using DotnetMedia.Core;
 
 namespace DotnetMedia.Sample.Api;
 
 internal sealed class SampleSettings
 {
     public string StorageRoot { get; set; } = string.Empty;
+    public string? StorageKeyPrefix { get; set; }
     public ImageProcessingOptions Image { get; set; } = new();
     public ulong NativeMemoryBytes { get; set; }
     public ulong NativeDiskBytes { get; set; }
@@ -25,6 +27,8 @@ internal sealed class SampleSettings
             throw new InvalidOperationException("MediaSample:StorageRoot must be an absolute private path outside the application directory.");
         try { _ = new DotnetMedia.Storage.Local.LocalMediaStore(settings.StorageRoot); }
         catch (ArgumentException error) { throw new InvalidOperationException("MediaSample:StorageRoot must be outside the application directory.", error); }
+        try { MediaKeyPrefix.Validate(settings.StorageKeyPrefix); }
+        catch (ArgumentException error) { throw new InvalidOperationException("MediaSample:StorageKeyPrefix must contain safe slash-separated segments.", error); }
         if (settings.NativeMemoryBytes == 0 || settings.NativeDiskBytes == 0 || settings.NativeListLength == 0 || settings.NativeThreads == 0)
             throw new InvalidOperationException("MediaSample native limits must all be positive.");
         if (image is null || image.MaxInputBytes is <= 0 or > 100_000_000 || image.MaxWidth is <= 0 or > 10_000 ||

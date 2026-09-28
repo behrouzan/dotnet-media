@@ -111,9 +111,10 @@ public sealed class ImageProcessorTests
         var store = new RecordingStore { FailAtSave = 2 };
         var failure = await Assert.ThrowsAsync<IOException>(() => new ImageProcessor(store).ProcessAsync(
             new MemoryStream(CreateImage(10, 10, MagickFormat.Png)), new ImageProcessingOptions
-            { Variants = [new("thumb", 5, 5, ResizeMode.Contain, ImageFormat.Png)] }));
+            { Variants = [new("thumb", 5, 5, ResizeMode.Contain, ImageFormat.Png)] }, keyPrefix: "shops/42/products"));
         Assert.Equal("storage failed", failure.Message);
         Assert.Single(store.DeletedKeys);
+        Assert.StartsWith("shops/42/products/", store.DeletedKeys[0]);
         Assert.Empty(store.Objects);
     }
 
@@ -191,12 +192,12 @@ public sealed class ImageProcessorTests
         public Dictionary<string, byte[]> Objects { get; } = new();
         public List<string> ContentTypes { get; } = new();
         public List<string> DeletedKeys { get; } = new();
-        public async Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default)
+        public async Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default, string? keyPrefix = null)
         {
             if (++saves == FailAtSave) throw new IOException("storage failed");
             using var output = new MemoryStream();
             await source.CopyToAsync(output, cancellationToken);
-            var key = Guid.NewGuid().ToString("N");
+            var key = (string.IsNullOrEmpty(keyPrefix) ? "" : keyPrefix + "/") + Guid.NewGuid().ToString("N");
             Objects.Add(key, output.ToArray());
             ContentTypes.Add(contentType);
             return new StoredMedia(key, output.Length);

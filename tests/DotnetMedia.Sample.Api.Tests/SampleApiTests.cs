@@ -32,7 +32,8 @@ public sealed class SampleApiTests
         {
             Assert.True(output.Length > 0);
             Assert.True(output.Width > 0 && output.Height > 0);
-            Assert.True(Guid.TryParseExact(output.Key, "N", out _));
+            Assert.StartsWith("sample/images/", output.Key);
+            Assert.True(Guid.TryParseExact(output.Key["sample/images/".Length..], "N", out _));
             using var read = await client.GetAsync("/media/" + output.Key);
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             using var decoded = new MagickImage(await read.Content.ReadAsByteArrayAsync());
@@ -48,7 +49,7 @@ public sealed class SampleApiTests
         using var client = factory.CreateClient();
         using var response = await client.PostAsync("/images", Form("not an image"u8.ToArray()));
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
-        Assert.Empty(Directory.GetFiles(factory.Root));
+        Assert.Empty(Directory.GetFiles(factory.Root, "*", SearchOption.AllDirectories));
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public sealed class SampleApiTests
         using var read = await client.GetAsync("/media/0123456789abcdef0123456789abcdef");
         Assert.Equal(HttpStatusCode.NotFound, upload.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
-        Assert.Empty(Directory.GetFiles(factory.Root));
+        Assert.Empty(Directory.GetFiles(factory.Root, "*", SearchOption.AllDirectories));
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public sealed class SampleApiTests
         using var tooLargeClient = tooLargeFactory.CreateClient();
         using var tooLarge = await tooLargeClient.PostAsync("/images", Form(new byte[256]));
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, tooLarge.StatusCode);
-        Assert.Empty(Directory.GetFiles(tooLargeFactory.Root));
+        Assert.Empty(Directory.GetFiles(tooLargeFactory.Root, "*", SearchOption.AllDirectories));
 
         using var pixelsFactory = new SampleFactory(new Dictionary<string, string?>
         {
@@ -95,7 +96,7 @@ public sealed class SampleApiTests
         using var pixelsClient = pixelsFactory.CreateClient();
         using var pixels = await pixelsClient.PostAsync("/images", Form(CreatePng()));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, pixels.StatusCode);
-        Assert.Empty(Directory.GetFiles(pixelsFactory.Root));
+        Assert.Empty(Directory.GetFiles(pixelsFactory.Root, "*", SearchOption.AllDirectories));
     }
 
     [Fact]
@@ -105,7 +106,7 @@ public sealed class SampleApiTests
         using var client = factory.CreateClient();
         using var response = await client.PostAsync("/images", Form(CreatePng()));
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Empty(Directory.GetFiles(factory.Root));
+        Assert.Empty(Directory.GetFiles(factory.Root, "*", SearchOption.AllDirectories));
     }
 
     [Fact]
@@ -114,6 +115,14 @@ public sealed class SampleApiTests
         using var factory = new SampleFactory(new Dictionary<string, string?> { ["MediaSample:Image:MaxWidth"] = "0" });
         var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
         Assert.Contains("MediaSample:Image", error.ToString());
+    }
+
+    [Fact]
+    public void InvalidStoragePrefixFailsAtStartup()
+    {
+        using var factory = new SampleFactory(new Dictionary<string, string?> { ["MediaSample:StorageKeyPrefix"] = "../escape" });
+        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        Assert.Contains("MediaSample:StorageKeyPrefix", error.ToString());
     }
 
     private static MultipartFormDataContent Form(byte[] bytes)
@@ -177,10 +186,10 @@ public sealed class SampleApiTests
     private sealed class FailingStore(IMediaStore inner) : IMediaStore
     {
         private int saves;
-        public Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default) =>
+        public Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default, string? keyPrefix = null) =>
             Interlocked.Increment(ref saves) == 2
                 ? Task.FromException<StoredMedia>(new IOException("simulated storage failure"))
-                : inner.SaveAsync(source, contentType, cancellationToken);
+                : inner.SaveAsync(source, contentType, cancellationToken, keyPrefix);
         public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken = default) => inner.OpenReadAsync(key, cancellationToken);
         public Task DeleteAsync(string key, CancellationToken cancellationToken = default) => inner.DeleteAsync(key, cancellationToken);
     }
