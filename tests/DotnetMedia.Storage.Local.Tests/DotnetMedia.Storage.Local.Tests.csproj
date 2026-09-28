@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DotnetMedia.Core\DotnetMedia.Core.csproj" />
+    <ProjectReference Include="..\..\src\DotnetMedia.Storage.Local\DotnetMedia.Storage.Local.csproj" />
   </ItemGroup>
 
 </Project>

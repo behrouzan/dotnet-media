@@ -1,6 +1,7 @@
 using DotnetMedia.Core;
+using DotnetMedia.Storage.Local;
 
-namespace DotnetMedia.Core.Tests;
+namespace DotnetMedia.Storage.Local.Tests;
 
 public sealed class LocalMediaStoreTests
 {
@@ -12,7 +13,7 @@ public sealed class LocalMediaStoreTests
         {
             var store = new LocalMediaStore(root);
             var bytes = new byte[] { 1, 2, 3, 4 };
-            var saved = await store.SaveAsync(new MemoryStream(bytes));
+            var saved = await store.SaveAsync(new MemoryStream(bytes), "image/jpeg");
             Assert.Equal(bytes.Length, saved.Length);
             Assert.True(Guid.TryParseExact(saved.Key, "N", out _));
             var output = new MemoryStream();
@@ -32,7 +33,9 @@ public sealed class LocalMediaStoreTests
         try
         {
             var store = new LocalMediaStore(root);
-            await Assert.ThrowsAsync<IOException>(() => store.SaveAsync(new FailingStream()));
+            var failure = new IOException("Simulated input failure");
+            var caught = await Assert.ThrowsAsync<IOException>(() => store.SaveAsync(new FailingStream(failure), "image/jpeg"));
+            Assert.Same(failure, caught);
             Assert.Empty(Directory.GetFiles(root));
         }
         finally { Directory.Delete(root, true); }
@@ -52,13 +55,15 @@ public sealed class LocalMediaStoreTests
 
     private sealed class FailingStream : Stream
     {
+        private readonly IOException failure;
+        public FailingStream(IOException failure) => this.failure = failure;
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
         public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-        public override int Read(byte[] buffer, int offset, int count) => throw new IOException("Simulated input failure");
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => ValueTask.FromException<int>(new IOException("Simulated input failure"));
+        public override int Read(byte[] buffer, int offset, int count) => throw failure;
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => ValueTask.FromException<int>(failure);
         public override void Flush() => throw new NotSupportedException();
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();

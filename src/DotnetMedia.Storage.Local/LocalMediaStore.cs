@@ -1,4 +1,6 @@
-namespace DotnetMedia.Core;
+using DotnetMedia.Core;
+
+namespace DotnetMedia.Storage.Local;
 
 /// <summary>Stores media in a private local directory, publishing each object only after a complete write.</summary>
 public sealed class LocalMediaStore : IMediaStore
@@ -20,9 +22,10 @@ public sealed class LocalMediaStore : IMediaStore
     }
 
     /// <inheritdoc />
-    public async Task<StoredMedia> SaveAsync(Stream source, CancellationToken cancellationToken = default)
+    public async Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
         cancellationToken.ThrowIfCancellationRequested();
         Directory.CreateDirectory(root);
         var key = Guid.NewGuid().ToString("N");
@@ -43,7 +46,9 @@ public sealed class LocalMediaStore : IMediaStore
         }
         catch
         {
-            File.Delete(temporary);
+            try { File.Delete(temporary); }
+            catch (IOException) { /* Preserve the original upload failure. */ }
+            catch (UnauthorizedAccessException) { /* Preserve the original upload failure. */ }
             throw;
         }
     }

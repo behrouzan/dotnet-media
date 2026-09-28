@@ -1,8 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/DotnetMedia.Core/DotnetMedia.Core.csproj" />
+    <Project Path="src/DotnetMedia.Storage.Local/DotnetMedia.Storage.Local.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/DotnetMedia.Core.Tests/DotnetMedia.Core.Tests.csproj" />
+    <Project Path="tests/DotnetMedia.Storage.Local.Tests/DotnetMedia.Storage.Local.Tests.csproj" />
   </Folder>
 </Solution>
