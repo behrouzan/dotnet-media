@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DotnetMedia.Core\DotnetMedia.Core.csproj" />
+    <ProjectReference Include="..\..\src\DotnetMedia.Imaging\DotnetMedia.Imaging.csproj" />
+    <ProjectReference Include="..\..\src\DotnetMedia.Storage.Local\DotnetMedia.Storage.Local.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

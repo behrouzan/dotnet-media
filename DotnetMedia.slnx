@@ -1,10 +1,14 @@
 <Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/DotnetMedia.Sample.Api/DotnetMedia.Sample.Api.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/DotnetMedia.Core/DotnetMedia.Core.csproj" />
     <Project Path="src/DotnetMedia.Imaging/DotnetMedia.Imaging.csproj" />
     <Project Path="src/DotnetMedia.Storage.Local/DotnetMedia.Storage.Local.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DotnetMedia.Sample.Api.Tests/DotnetMedia.Sample.Api.Tests.csproj" />
     <Project Path="tests/DotnetMedia.Storage.Local.Tests/DotnetMedia.Storage.Local.Tests.csproj" />
     <Project Path="tests/DotnetMedia.Imaging.Tests/DotnetMedia.Imaging.Tests.csproj" />
   </Folder>

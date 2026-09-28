@@ -39,3 +39,5 @@ For deployment, set the storage root to a private absolute directory outside the
 Antimalware scanning is outside this package's first implementation. A future consumer can scan the bounded input before invoking the image pipeline and before any public publication. No scanner adapter or stub is included.
 
 See [design](docs/design.md) and [image engine decision](docs/image-engine.md). Run `dotnet test DotnetMedia.slnx` to verify this slice.
+
+The [ASP.NET Core sample](samples/DotnetMedia.Sample.Api/README.md) shows an HTTP multipart upload that produces an original and two named versions using configuration, plus a Development-only read route for local testing.
