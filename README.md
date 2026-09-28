@@ -1,21 +1,38 @@
 # dotnet-media
 
-An early, unpublished .NET 8 media library. This branch contains the first buildable slice: `DotnetMedia.Core` holds storage contracts and independent models; `DotnetMedia.Storage.Local` implements private local disk storage. Its public names, project names and eventual NuGet ID are **provisional** and need consumer review before publication.
+An early, unpublished .NET 8 media library. `DotnetMedia.Core` holds storage contracts, `DotnetMedia.Storage.Local` implements private disk storage, and `DotnetMedia.Imaging` validates and processes raster uploads. Public names and eventual NuGet IDs are **provisional** pending consumer review.
 
 ## Current use
 
 ```csharp
 using DotnetMedia.Core;
 using DotnetMedia.Storage.Local;
+using DotnetMedia.Imaging;
 
 IMediaStore store = new LocalMediaStore(@"D:\private-media");
-await using var input = File.OpenRead("validated-image.jpg");
-StoredMedia item = await store.SaveAsync(input, "image/jpeg", cancellationToken);
-await using Stream output = await store.OpenReadAsync(item.Key, cancellationToken);
-await store.DeleteAsync(item.Key, cancellationToken);
+await using var input = File.OpenRead("untrusted-upload");
+var result = await new ImageProcessor(store).ProcessAsync(input, new ImageProcessingOptions
+{
+    MaxInputBytes = 10 * 1024 * 1024,
+    MaxWidth = 6000,
+    MaxHeight = 6000,
+    MaxPixels = 24_000_000,
+    OriginalMode = OriginalMode.Reencode,
+    OriginalFormat = ImageFormat.Jpeg,
+    OriginalMaxWidth = 1800,
+    OriginalMaxHeight = 1800,
+    Variants =
+    [
+        new("card", 640, 640, ResizeMode.Cover, ImageFormat.WebP, 82),
+        new("thumb", 240, 240, ResizeMode.Contain, ImageFormat.Jpeg, 80)
+    ]
+}, cancellationToken);
+// result.Original and result.Variants contain keys, types, dimensions and byte lengths.
 ```
 
-`SaveAsync` stores bytes as supplied. Its `contentType` must come from validated image content, never the upload header or filename. The local store does not use it on disk, but the same contract lets a future object store set HTTP Content-Type. This slice does **not** validate or process images, so an application must not expose these objects publicly yet. The final upload service will decode and validate input before storage, then generate the original and named variants and clean up all saved objects if any step fails.
+`ImageProcessor` ignores uploaded filenames and Content-Type headers. It accepts JPEG, PNG and WebP only, rejects SVG and animation, applies byte/dimension/pixel limits, corrects orientation, and cleans up earlier outputs if a later output fails. `PreserveIfPossible` retains input bytes **and metadata** only if input format matches `OriginalFormat`, orientation needs no correction and original size limits are met. Otherwise it reencodes to `OriginalFormat` and strips metadata. `SaveAsync` remains a lower-level storage API and does not itself validate image bytes.
+
+The host must configure Magick.NET native `ResourceLimits` explicitly at startup. They affect the entire process; constructing `ImageProcessor` does not change them. See the [host configuration example](docs/design.md#proposed-upload-settings-and-flow) and choose native memory/disk/thread ceilings appropriate for the deployment. Per-upload byte, dimension and pixel limits remain in `ImageProcessor`.
 
 For deployment, set the storage root to a private absolute directory outside the app and web root. Deny execution and direct web serving at the filesystem and server level; restrict permissions to the service identity. The constructor rejects paths inside `AppContext.BaseDirectory`, but it cannot enforce OS access rules or detect every deployment layout. User supplied filenames never become storage keys. Treat keys as opaque identifiers and authorize read/delete operations in the application.
 

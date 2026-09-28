@@ -2,7 +2,7 @@
 
 ## Boundaries
 
-- `DotnetMedia.Core` (provisional) owns storage contracts and storage-independent models. `DotnetMedia.Storage.Local` owns the local implementation. A later image package/service will own validation, decode, orientation, original processing and named variants.
+- `DotnetMedia.Core` (provisional) owns storage contracts and storage-independent models. `DotnetMedia.Storage.Local` owns the local implementation. `DotnetMedia.Imaging` owns validation, decode, orientation, original processing and named variants.
 - Commerce owns the gallery: its ten-image cap, order, primary image selection, admin authorization, and association with products. The media library receives one file and settings, returning independent objects and metadata.
 - An ASP.NET Core example will stream a raw multipart upload into the service. It will require no browser-side crop or compression.
 - A future S3-compatible adapter can implement `IMediaStore`; it is not part of this slice.
@@ -15,16 +15,33 @@ If temporary-file cleanup itself fails after an upload error, the local store pr
 
 ## Proposed upload settings and flow
 
-Proposed settings: maximum input bytes, width, height and pixels; allowed decoded formats (JPEG, PNG, WebP); an original policy (`PreserveIfCompliant` or `Reencode`); and named variants with width, height, fit/cover resize, output format and quality. These types have not yet been made public. Processing decisions will follow decoded dimensions, format, orientation and requested outputs, not a file-size threshold.
+Current settings: maximum input bytes, width, height and pixels; a configurable decoded input subset of JPEG, PNG and WebP; an original policy (`PreserveIfPossible` or `Reencode`); and named variants with width, height, contain/cover resize, output format and quality. The policy does not use a file-size threshold. Names and package IDs remain provisional until actual consumer review.
 
 The pipeline will count bytes while accepting the upload, identify and decode actual content, reject disallowed formats and limits, normalize EXIF orientation, then apply the original policy and encode each variant. It will write only validated outputs, return each key, width, height, format and byte count, and delete already written outputs if a later write fails. Cancellation passes through every stage. A caller can then record product-gallery metadata in its own transaction; if that transaction fails, it should delete the returned media objects.
 
 Animated images and SVG are rejected in the initial pipeline. This includes animated WebP; no silent first-frame flattening. An explicit animation policy would require a later design review. SVG is not a raster photo and will not be decoded through this pipeline.
 
+The upload is read into bounded memory, and the byte limit is checked during each read. Signature and animation checks precede Magick.NET header inspection; width, height and pixel count are checked before full decode. The processor does not change ImageMagick's process-wide `ResourceLimits`. The host must set native limits explicitly at startup, before processing images or sharing Magick.NET with other components. For example, an upload-only host can set:
+
+```csharp
+using ImageMagick;
+
+ResourceLimits.Memory = 256UL * 1024 * 1024;
+ResourceLimits.Disk = 512UL * 1024 * 1024;
+ResourceLimits.ListLength = 16;
+ResourceLimits.Thread = 2;
+ResourceLimits.Width = 10_000;
+ResourceLimits.Height = 10_000;
+```
+
+These values are deployment examples, not library defaults. The host owns their sizing for concurrency and other Magick.NET users, protects the native temporary directory, and should use OS/container memory, disk and CPU limits for untrusted high-volume uploads. Per-request byte, dimension and pixel limits remain enforced in the processor. Cancellation is checked during input reads and between synchronous native stages; it cannot interrupt a native decode or encode already in progress.
+
+Reencoded outputs have profiles and metadata stripped after auto-orientation. `PreserveIfPossible` retains original bytes and their metadata only when input format equals `OriginalFormat`, orientation needs no correction and size complies. Any mismatch forces reencoding to `OriginalFormat` and strips metadata. Choose preservation only when metadata retention is acceptable. Invalid input is reported with an `ImageProcessingException` category; storage and native runtime errors propagate. Cleanup runs with an uncancelled token and preserves the original error if deletion fails. A storage adapter must avoid publishing a partial object when `SaveAsync` throws, since the processor has no key to clean up in that case.
+
 ## Review checkpoints
 
 1. This branch: core contract, working local store, tests and decision record.
-2. Image validation and processing with named variants, cleanup tests and XML docs.
+2. This branch: image validation and processing with named variants, cleanup tests and XML docs.
 3. ASP.NET Core sample, end-to-end failure cases and deployment guidance.
 
 Before a package ID or public API is finalized, review names against actual Commerce consumption. Do not publish to NuGet until that consumption and review are complete.
