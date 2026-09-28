@@ -22,15 +22,17 @@ public sealed class LocalMediaStore : IMediaStore
     }
 
     /// <inheritdoc />
-    public async Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default)
+    public async Task<StoredMedia> SaveAsync(Stream source, string contentType, CancellationToken cancellationToken = default, string? keyPrefix = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
+        MediaKeyPrefix.Validate(keyPrefix);
         cancellationToken.ThrowIfCancellationRequested();
-        Directory.CreateDirectory(root);
-        var key = Guid.NewGuid().ToString("N");
-        var temporary = Path.Combine(root, "." + key + ".tmp");
-        var destination = Path.Combine(root, key);
+        var directory = ResolveDirectory(keyPrefix, create: true);
+        var filename = Guid.NewGuid().ToString("N");
+        var key = string.IsNullOrEmpty(keyPrefix) ? filename : keyPrefix + "/" + filename;
+        var temporary = Path.Combine(directory, "." + filename + ".tmp");
+        var destination = Path.Combine(directory, filename);
         try
         {
             await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write,
@@ -56,9 +58,10 @@ public sealed class LocalMediaStore : IMediaStore
     /// <inheritdoc />
     public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
+        var path = ResolveKey(key);
         cancellationToken.ThrowIfCancellationRequested();
-        Stream stream = new FileStream(Path.Combine(root, key), FileMode.Open, FileAccess.Read,
+        RejectLink(path);
+        Stream stream = new FileStream(path, FileMode.Open, FileAccess.Read,
             FileShare.Read, 81920, FileOptions.Asynchronous);
         return Task.FromResult(stream);
     }
@@ -66,15 +69,50 @@ public sealed class LocalMediaStore : IMediaStore
     /// <inheritdoc />
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        ValidateKey(key);
+        var path = ResolveKey(key);
         cancellationToken.ThrowIfCancellationRequested();
-        File.Delete(Path.Combine(root, key));
+        RejectLink(path);
+        File.Delete(path);
         return Task.CompletedTask;
     }
 
-    private static void ValidateKey(string key)
+    private string ResolveKey(string key)
     {
-        if (key is null || key.Length != 32 || !Guid.TryParseExact(key, "N", out _))
+        if (string.IsNullOrEmpty(key))
             throw new ArgumentException("Invalid storage key.", nameof(key));
+        var separator = key.LastIndexOf('/');
+        var prefix = separator < 0 ? null : key[..separator];
+        if (separator == 0) throw new ArgumentException("Invalid storage key.", nameof(key));
+        var filename = key[(separator + 1)..];
+        MediaKeyPrefix.Validate(prefix);
+        if (filename.Length != 32 || filename.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
+            throw new ArgumentException("Invalid storage key.", nameof(key));
+        return Path.Combine(ResolveDirectory(prefix, create: false), filename);
+    }
+
+    private string ResolveDirectory(string? prefix, bool create)
+    {
+        if (create) Directory.CreateDirectory(root);
+        RejectLink(root);
+        var directory = root;
+        if (string.IsNullOrEmpty(prefix)) return directory;
+        foreach (var segment in prefix.Split('/'))
+        {
+            directory = Path.Combine(directory, segment);
+            if (create) Directory.CreateDirectory(directory);
+            RejectLink(directory);
+        }
+        return directory;
+    }
+
+    private static void RejectLink(string path)
+    {
+        try
+        {
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Storage paths must not contain symbolic links or reparse points.");
+        }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
     }
 }

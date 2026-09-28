@@ -11,12 +11,13 @@ public sealed class ImageProcessor
     /// <summary>Creates a processor using the supplied storage adapter.</summary>
     public ImageProcessor(IMediaStore store) => this.store = store ?? throw new ArgumentNullException(nameof(store));
 
-    /// <summary>Processes an untrusted stream. The caller retains ownership of the stream.</summary>
-    public async Task<ProcessedImage> ProcessAsync(Stream input, ImageProcessingOptions options, CancellationToken cancellationToken = default)
+    /// <summary>Processes an untrusted stream under an optional logical storage key prefix. The caller retains ownership of the stream.</summary>
+    public async Task<ProcessedImage> ProcessAsync(Stream input, ImageProcessingOptions options, CancellationToken cancellationToken = default, string? keyPrefix = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
         ValidateOptions(options);
+        MediaKeyPrefix.Validate(keyPrefix);
         var saved = new List<string>();
         try
         {
@@ -54,13 +55,13 @@ public sealed class ImageProcessor
                 originalOrientation is OrientationType.TopLeft or OrientationType.Undefined &&
                 (options.OriginalMaxWidth == 0 || image.Width <= options.OriginalMaxWidth) &&
                 (options.OriginalMaxHeight == 0 || image.Height <= options.OriginalMaxHeight))
-                original = await SaveAsync("original", bytes, format, (int)image.Width, (int)image.Height, saved, cancellationToken);
+                original = await SaveAsync("original", bytes, format, (int)image.Width, (int)image.Height, saved, cancellationToken, keyPrefix);
             else
             {
                 using var copy = image.Clone();
                 ResizeContain(copy, options.OriginalMaxWidth == 0 ? (int)copy.Width : options.OriginalMaxWidth,
                     options.OriginalMaxHeight == 0 ? (int)copy.Height : options.OriginalMaxHeight);
-                original = await EncodeAndSaveAsync("original", copy, options.OriginalFormat, options.OriginalQuality, saved, cancellationToken);
+                original = await EncodeAndSaveAsync("original", copy, options.OriginalFormat, options.OriginalQuality, saved, cancellationToken, keyPrefix);
             }
 
             var variants = new List<ImageOutput>(options.Variants.Count);
@@ -70,7 +71,7 @@ public sealed class ImageProcessor
                 using var copy = image.Clone();
                 if (variant.Mode == ResizeMode.Cover) ResizeCover(copy, variant.Width, variant.Height);
                 else ResizeContain(copy, variant.Width, variant.Height);
-                variants.Add(await EncodeAndSaveAsync(variant.Name, copy, variant.Format, variant.Quality, saved, cancellationToken));
+                variants.Add(await EncodeAndSaveAsync(variant.Name, copy, variant.Format, variant.Quality, saved, cancellationToken, keyPrefix));
             }
             return new ProcessedImage(original, variants);
             }
@@ -87,22 +88,22 @@ public sealed class ImageProcessor
     }
 
     private async Task<ImageOutput> EncodeAndSaveAsync(string name, IMagickImage<byte> image, ImageFormat format, int quality,
-        List<string> saved, CancellationToken cancellationToken)
+        List<string> saved, CancellationToken cancellationToken, string? keyPrefix)
     {
         cancellationToken.ThrowIfCancellationRequested();
         image.Quality = (uint)quality;
         using var output = new MemoryStream();
         image.Write(output, ToMagickFormat(format));
         cancellationToken.ThrowIfCancellationRequested();
-        return await SaveAsync(name, output.ToArray(), format, (int)image.Width, (int)image.Height, saved, cancellationToken);
+        return await SaveAsync(name, output.ToArray(), format, (int)image.Width, (int)image.Height, saved, cancellationToken, keyPrefix);
     }
 
     private async Task<ImageOutput> SaveAsync(string name, byte[] bytes, ImageFormat format, int width, int height,
-        List<string> saved, CancellationToken cancellationToken)
+        List<string> saved, CancellationToken cancellationToken, string? keyPrefix)
     {
         var type = ContentType(format);
         using var source = new MemoryStream(bytes, writable: false);
-        var stored = await store.SaveAsync(source, type, cancellationToken);
+        var stored = await store.SaveAsync(source, type, cancellationToken, keyPrefix);
         saved.Add(stored.Key);
         return new ImageOutput(name, stored.Key, format, type, width, height, stored.Length);
     }
