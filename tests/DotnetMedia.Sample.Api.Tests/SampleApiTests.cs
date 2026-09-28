@@ -63,12 +63,15 @@ public sealed class SampleApiTests
     }
 
     [Fact]
-    public async Task ReadRouteIsUnavailableOutsideDevelopment()
+    public async Task UploadAndReadRoutesAreUnavailableOutsideDevelopment()
     {
         using var factory = new SampleFactory(environment: "Production");
         using var client = factory.CreateClient();
-        using var response = await client.GetAsync("/media/0123456789abcdef0123456789abcdef");
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var upload = await client.PostAsync("/images", Form(CreatePng()));
+        using var read = await client.GetAsync("/media/0123456789abcdef0123456789abcdef");
+        Assert.Equal(HttpStatusCode.NotFound, upload.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Empty(Directory.GetFiles(factory.Root));
     }
 
     [Fact]

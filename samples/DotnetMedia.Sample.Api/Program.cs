@@ -24,6 +24,9 @@ builder.Services.AddSingleton<ImageProcessor>();
 
 var app = builder.Build();
 
+// These unauthenticated sample routes are available only for local Development testing.
+if (app.Environment.IsDevelopment())
+{
 app.MapPost("/images", async (HttpRequest request, ImageProcessor processor, ImageProcessingOptions imageOptions, CancellationToken token) =>
 {
     if (!request.HasFormContentType)
@@ -62,9 +65,6 @@ app.MapPost("/images", async (HttpRequest request, ImageProcessor processor, Ima
     }
 });
 
-// This unauthenticated read route is for local sample testing only.
-if (app.Environment.IsDevelopment())
-{
     app.MapGet("/media/{key}", async (string key, IMediaStore store, CancellationToken token) =>
     {
         try { return Results.File(await store.OpenReadAsync(key, token), "application/octet-stream"); }
