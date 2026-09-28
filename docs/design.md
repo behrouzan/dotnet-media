@@ -4,7 +4,7 @@
 
 - `DotnetMedia.Core` (provisional) owns storage contracts and storage-independent models. `DotnetMedia.Storage.Local` owns the local implementation. `DotnetMedia.Imaging` owns validation, decode, orientation, original processing and named variants.
 - Commerce owns the gallery: its ten-image cap, order, primary image selection, admin authorization, and association with products. The media library receives one file and settings, returning independent objects and metadata.
-- An ASP.NET Core example will stream a raw multipart upload into the service. It will require no browser-side crop or compression.
+- The ASP.NET Core sample accepts a raw multipart upload and passes its stream to the image service. It requires no browser-side crop or compression.
 - A future S3-compatible adapter can implement `IMediaStore`; it is not part of this slice.
 
 ## Storage request metadata
@@ -42,6 +42,6 @@ Reencoded outputs have profiles and metadata stripped after auto-orientation. `P
 
 1. This branch: core contract, working local store, tests and decision record.
 2. This branch: image validation and processing with named variants, cleanup tests and XML docs.
-3. ASP.NET Core sample, end-to-end failure cases and deployment guidance.
+3. This branch: ASP.NET Core sample, HTTP failure cases and deployment guidance.
 
 Before a package ID or public API is finalized, review names against actual Commerce consumption. Do not publish to NuGet until that consumption and review are complete.
