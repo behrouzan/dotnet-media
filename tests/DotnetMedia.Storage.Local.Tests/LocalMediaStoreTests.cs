@@ -75,10 +75,36 @@ public sealed class LocalMediaStoreTests
     [InlineData("products:secret")]
     [InlineData(" products")]
     [InlineData("products/%2e%2e")]
+    [InlineData("CON")]
+    [InlineData("con")]
+    [InlineData("PrN")]
+    [InlineData("aUx")]
+    [InlineData("nul")]
+    [InlineData("COM1")]
+    [InlineData("com9")]
+    [InlineData("LPT1")]
+    [InlineData("lPt9")]
+    [InlineData("shops/42/CoM4/products")]
     public async Task RejectsInvalidPrefixes(string prefix)
     {
         var store = new LocalMediaStore(NewRoot());
         await Assert.ThrowsAsync<ArgumentException>(() => store.SaveAsync(new MemoryStream([1]), "image/png", keyPrefix: prefix));
+    }
+
+    [Fact]
+    public async Task SimilarNonReservedPrefixRemainsUsable()
+    {
+        var root = NewRoot();
+        try
+        {
+            var store = new LocalMediaStore(root);
+            var saved = await store.SaveAsync(new MemoryStream([7]), "image/png", keyPrefix: "shops/42/CONtent/COM10");
+            Assert.StartsWith("shops/42/CONtent/COM10/", saved.Key);
+            await using (var read = await store.OpenReadAsync(saved.Key))
+                Assert.Equal(7, read.ReadByte());
+            await store.DeleteAsync(saved.Key);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     [Theory]
@@ -89,6 +115,7 @@ public sealed class LocalMediaStoreTests
     [InlineData("shops\\42/0123456789abcdef0123456789abcdef")]
     [InlineData("shops/42/0123456789abcdef0123456789abcdeg")]
     [InlineData("/0123456789abcdef0123456789abcdef")]
+    [InlineData("shops/NuL/0123456789abcdef0123456789abcdef")]
     public async Task RejectsUntrustedKeys(string key)
     {
         var store = new LocalMediaStore(NewRoot());

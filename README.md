@@ -4,7 +4,7 @@ An early, unpublished .NET 8 media library. `DotnetMedia.Core` holds storage con
 
 ## Current use
 
-`keyPrefix` is optional per operation; omit it or pass `null`/`""` to save at the configured root. It is a logical, slash-separated namespace, not a filesystem path. Segments use ASCII letters, digits, `-` and `_`, starting with a letter or digit. The store generates each final filename and returns the complete key (for example `shops/42/products/<generated-id>`); keep that key in the consumer's own records for later reads and deletes. The package has no database, entity or migration.
+`keyPrefix` is optional per operation; omit it or pass `null`/`""` to save at the configured root. It is a logical, slash-separated namespace, not a filesystem path. Segments use ASCII letters, digits, `-` and `_`, starting with a letter or digit. Windows device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`) are rejected in every segment regardless of case, on every OS. The store generates each final filename and returns the complete key (for example `shops/42/products/<generated-id>`); keep that key in the consumer's own records for later reads and deletes. The package has no database, entity or migration.
 
 ```csharp
 using DotnetMedia.Core;
