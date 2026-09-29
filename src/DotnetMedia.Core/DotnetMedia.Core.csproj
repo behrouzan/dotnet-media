@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>DotnetMedia.Core</PackageId>
+    <Description>Storage contracts and portable media key prefix validation for dotnet-media.</Description>
+    <PackageTags>media;storage;dotnet</PackageTags>
   </PropertyGroup>
 
 </Project>
