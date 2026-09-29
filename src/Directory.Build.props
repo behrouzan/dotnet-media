@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.1.0-preview.1</Version>
+    <PackageVersion>$(Version)</PackageVersion>
+    <Authors>behrouzan</Authors>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/behrouzan/dotnet-media</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/behrouzan/dotnet-media</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\docs\LOCAL-NUGET-PREVIEW.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+</Project>

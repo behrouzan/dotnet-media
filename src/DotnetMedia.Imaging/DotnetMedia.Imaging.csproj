@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>DotnetMedia.Imaging</PackageId>
+    <Description>Validated raster image processing and named variants for dotnet-media.</Description>
+    <PackageTags>media;images;magick;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,6 +4,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>DotnetMedia.Storage.Local</PackageId>
+    <Description>Private local filesystem storage adapter for dotnet-media.</Description>
+    <PackageTags>media;storage;filesystem;dotnet</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DotnetMedia.Core\DotnetMedia.Core.csproj" />
